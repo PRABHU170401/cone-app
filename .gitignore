@@ -1,0 +1,16 @@
+# Buildozer build artifacts
+.buildozer/
+.buildozer_cache/
+bin/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build logs
+build.log
+
+# OS files
+.DS_Store
+Thumbs.db
