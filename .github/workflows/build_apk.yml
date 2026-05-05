@@ -1,0 +1,85 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build APK with Buildozer
+    runs-on: ubuntu-22.04
+
+    steps:
+      # ── 1. Check out the repository ──────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Python ─────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── 3. Install system dependencies for Buildozer / Android SDK ───────────
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip python3-pip \
+            autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libtinfo5 cmake libffi-dev libssl-dev \
+            ccache openjdk-17-jdk
+
+      # ── 4. Cache Buildozer downloads (.buildozer_cache) ──────────────────────
+      - name: Cache Buildozer download cache
+        uses: actions/cache@v4
+        with:
+          path: .buildozer_cache
+          key: buildozer-cache-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-cache-${{ runner.os }}-
+
+      # ── 5. Cache the .buildozer build directory (speeds up rebuilds) ─────────
+      - name: Cache Buildozer build directory
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: buildozer-build-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-${{ hashFiles('**/*.py') }}
+          restore-keys: |
+            buildozer-build-${{ runner.os }}-
+
+      # ── 6. Install Buildozer and Cython ──────────────────────────────────────
+      - name: Install Buildozer
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython
+
+      # ── 7. Build debug APK ───────────────────────────────────────────────────
+      - name: Build APK (debug)
+        env:
+          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+        run: |
+          buildozer -v android debug 2>&1 | tee build.log
+
+      # ── 8. Upload the APK as a build artifact ────────────────────────────────
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cone-calculator-debug-apk
+          path: bin/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # ── 9. Upload build log for debugging if something goes wrong ─────────────
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
