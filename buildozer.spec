@@ -12,7 +12,7 @@ requirements = python3==3.10.14,kivy==2.3.0,openpyxl
 
 android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,INTERNET
 android.minapi = 21
-android.api = 31
+android.api = 33
 android.ndk = 25b
 android.archs = arm64-v8a
 android.accept_sdk_license = True
