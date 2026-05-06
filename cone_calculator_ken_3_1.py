@@ -628,7 +628,7 @@ class ResultRecordListPopup(Popup):
 
         root = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(8))
 
-        # Column  header row
+        # Column header row
         col_hdr = GridLayout(
             cols=4, size_hint_y=None, height=dp(28),
             spacing=[dp(4), 0], padding=[dp(14), 0],
@@ -1379,8 +1379,10 @@ class ConeCalculator(FloatLayout):
         small = calculate(sl, sw, sh, se)
         big   = calculate(bl, bw, bh, be)
 
-        self.lbl_small.text = f"Small = {small if small is not None else '\u2014'}"
-        self.lbl_big.text   = f"Big   = {big   if big   is not None else '\u2014'}"
+        _s = str(small) if small is not None else '—'
+        self.lbl_small.text = f"Small = {_s}"
+        _b = str(big) if big is not None else '—'
+        self.lbl_big.text   = f"Big   = {_b}"
 
         if small is not None and big is not None:
             self.lbl_total.text = f"Total = {small + big}"
