@@ -13,11 +13,9 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # ── 1. Check out the repository ──────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. Rename main Python file to main.py ────────────────────────────────
       - name: Rename entry point to main.py
         run: |
           if [ ! -f main.py ]; then
@@ -27,20 +25,17 @@ jobs:
               echo "Renamed $PY_FILE to main.py"
             else
               echo "ERROR: No cone_calculator*.py file found!"
-              ls -la *.py || true
               exit 1
             fi
           else
-            echo "main.py already exists, skipping rename."
+            echo "main.py already exists."
           fi
 
-      # ── 3. Set up Python 3.10 ────────────────────────────────────────────────
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # ── 4. Install system dependencies ───────────────────────────────────────
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
@@ -49,10 +44,14 @@ jobs:
             autoconf libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             libtinfo5 cmake libffi-dev libssl-dev \
-            ccache openjdk-17-jdk \
-            liblzma-dev uuid-dev
+            ccache liblzma-dev uuid-dev \
+            openjdk-17-jdk
 
-      # ── 5. Cache Buildozer downloads ─────────────────────────────────────────
+      - name: Set Java 17 as default
+        run: |
+          sudo update-java-alternatives --set java-1.17.0-openjdk-amd64
+          java -version
+
       - name: Cache Buildozer download cache
         uses: actions/cache@v4
         with:
@@ -61,7 +60,6 @@ jobs:
           restore-keys: |
             buildozer-cache-${{ runner.os }}-
 
-      # ── 6. Cache Buildozer build directory ───────────────────────────────────
       - name: Cache Buildozer build directory
         uses: actions/cache@v4
         with:
@@ -70,7 +68,6 @@ jobs:
           restore-keys: |
             buildozer-build-${{ runner.os }}-
 
-      # ── 7. Install Buildozer with pinned p4a ─────────────────────────────────
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
@@ -78,29 +75,27 @@ jobs:
           pip install buildozer==1.5.0
           pip install python-for-android==2023.9.16
 
-      # ── 8. Build debug APK ───────────────────────────────────────────────────
       - name: Build APK (debug)
         env:
           ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
+          export PATH=$JAVA_HOME/bin:$PATH
+          java -version
           buildozer -v android debug 2>&1 | tee build.log || true
 
-      # ── 9. Show last 100 lines of build log ──────────────────────────────────
       - name: Show build log tail
         if: always()
         run: |
-          echo "=== LAST 100 LINES OF BUILD LOG ==="
+          echo "=== LAST 100 LINES ==="
           tail -100 build.log || echo "No build.log found"
 
-      # ── 10. List bin directory ────────────────────────────────────────────────
       - name: List bin directory
         if: always()
         run: |
-          echo "=== bin/ contents ==="
           ls -lh bin/ 2>/dev/null || echo "bin/ does not exist"
           find . -name "*.apk" 2>/dev/null || echo "No .apk files found"
 
-      # ── 11. Upload APK artifact ───────────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -109,7 +104,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # ── 12. Upload build log ──────────────────────────────────────────────────
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
