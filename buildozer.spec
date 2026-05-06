@@ -10,7 +10,7 @@ version = 1.2.0
 
 requirements = python3==3.10.14,kivy==2.3.0,openpyxl,sdl2,sdl2_image,sdl2_mixer,sdl2_ttf
 
-android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,INTERNET
+android.permissions = INTERNET
 android.minapi = 21
 android.api = 36
 android.ndk = 25b
