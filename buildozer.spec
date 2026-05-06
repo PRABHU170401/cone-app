@@ -12,7 +12,11 @@ package.domain = org.ken
 # Source directory (relative to buildozer.spec)
 source.dir = .
 
-# Main entry point
+# Main entry point — Buildozer REQUIRES this to be main.py
+# The workflow renames your .py file to main.py automatically
+source.main = main.py
+
+# File extensions to include in the APK
 source.include_exts = py,png,jpg,kv,atlas,json,txt
 
 # App version
