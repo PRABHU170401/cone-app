@@ -1,5 +1,4 @@
 [app]
-
 title = Cone Calculator
 package.name = conecalculator
 package.domain = org.ken
@@ -8,12 +7,14 @@ source.main = main.py
 source.include_exts = py,png,jpg,kv,atlas,json,txt
 version = 1.2.0
 
-requirements = python3==3.10.14,kivy==2.3.0,openpyxl,sdl2,sdl2_image,sdl2_mixer,sdl2_ttf
+# Added pillow and et_xmlfile which are often needed by openpyxl
+requirements = python3==3.10.14,kivy==2.3.0,openpyxl,et_xmlfile,pillow,sdl2,sdl2_image,sdl2_mixer,sdl2_ttf
 
-android.permissions = INTERNET
+android.permissions = INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
 android.minapi = 21
-android.api = 36
-android.ndk = 25b
+# Downgraded from 36 to 34 for stability with Buildozer 1.5.0
+android.api = 34
+android.ndk = 25c
 android.archs = arm64-v8a
 android.accept_sdk_license = True
 android.enable_androidx = True
