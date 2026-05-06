@@ -31,6 +31,23 @@ jobs:
             echo "main.py already exists."
           fi
 
+      - name: Verify buildozer.spec is valid INI (not YAML)
+        run: |
+          echo "=== First 5 lines of buildozer.spec ==="
+          head -5 buildozer.spec
+          if head -1 buildozer.spec | grep -q "^name:"; then
+            echo "ERROR: buildozer.spec looks like YAML! It must be INI format starting with [app]"
+            exit 1
+          fi
+          python3 -c "
+          import configparser
+          c = configparser.ConfigParser()
+          c.read('buildozer.spec')
+          print('buildozer.spec sections:', c.sections())
+          assert 'app' in c.sections(), 'Missing [app] section!'
+          print('buildozer.spec is valid.')
+          "
+
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
@@ -53,20 +70,35 @@ jobs:
           echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
           java -version
 
-      - name: Install Android SDK and API 33
+      - name: Install Buildozer and deps
         run: |
-          export ANDROID_SDK_ROOT=$HOME/android-sdk
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
-          cd $ANDROID_SDK_ROOT/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip
-          mv cmdline-tools latest
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          yes | sdkmanager --licenses
-          sdkmanager "platforms;android-33" "build-tools;33.0.2" "platform-tools"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
+          pip install --upgrade pip
+          pip install cython==0.29.33
+          pip install buildozer==1.5.0
+          pip install python-for-android==2024.1.21
+
+      - name: Pre-install Android SDK into Buildozer directory
+        run: |
+          BUILDOZER_SDK=$HOME/.buildozer/android/platform/android-sdk
+          mkdir -p $BUILDOZER_SDK/cmdline-tools
+
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline-tools.zip
+          unzip -q /tmp/cmdline-tools.zip -d $BUILDOZER_SDK/cmdline-tools
+          mv $BUILDOZER_SDK/cmdline-tools/cmdline-tools $BUILDOZER_SDK/cmdline-tools/latest
+
+          export PATH=$BUILDOZER_SDK/cmdline-tools/latest/bin:$PATH
+          export ANDROID_SDK_ROOT=$BUILDOZER_SDK
+
+          # Accept licenses and install API 36 (Android 16)
+          yes | sdkmanager --sdk_root=$BUILDOZER_SDK --licenses
+          sdkmanager --sdk_root=$BUILDOZER_SDK \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "platform-tools" \
+            "ndk;25.2.9519653"
+
+          echo "SDK installed at $BUILDOZER_SDK"
+          ls $BUILDOZER_SDK/platforms/
 
       - name: Cache Buildozer download cache
         uses: actions/cache@v4
@@ -84,19 +116,13 @@ jobs:
           restore-keys: |
             buildozer-build-${{ runner.os }}-
 
-      - name: Install Buildozer
-        run: |
-          pip install --upgrade pip
-          pip install cython==0.29.33
-          pip install buildozer==1.5.0
-          pip install python-for-android==2024.1.21
-
       - name: Build APK (debug)
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+          ANDROID_NDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk/ndk/25.2.9519653
         run: |
           export PATH=$JAVA_HOME/bin:$PATH
-          export ANDROID_SDK_ROOT=$HOME/android-sdk
           buildozer -v android debug 2>&1 | tee build.log || true
 
       - name: Show build log tail
