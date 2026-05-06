@@ -1,139 +1,29 @@
-name: Build Android APK
+[app]
 
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
+title = Cone Calculator
+package.name = conecalculator
+package.domain = org.ken
+source.dir = .
+source.main = main.py
+source.include_exts = py,png,jpg,kv,atlas,json,txt
+version = 1.2.0
 
-jobs:
-  build-apk:
-    name: Build APK with Buildozer
-    runs-on: ubuntu-22.04
+requirements = python3==3.10.14,kivy==2.3.0,openpyxl,sdl2,sdl2_image,sdl2_mixer,sdl2_ttf
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,INTERNET
+android.minapi = 21
+android.api = 36
+android.ndk = 25b
+android.archs = arm64-v8a
+android.accept_sdk_license = True
+android.enable_androidx = True
+android.gradle_dependencies = androidx.appcompat:appcompat:1.6.1
 
-      - name: Rename entry point to main.py
-        run: |
-          if [ ! -f main.py ]; then
-            PY_FILE=$(ls cone_calculator*.py 2>/dev/null | head -1)
-            if [ -n "$PY_FILE" ]; then
-              cp "$PY_FILE" main.py
-              echo "Renamed $PY_FILE to main.py"
-            else
-              echo "ERROR: No cone_calculator*.py file found!"
-              exit 1
-            fi
-          else
-            echo "main.py already exists."
-          fi
+orientation = portrait
+fullscreen = 0
+log_level = 2
+warn_on_root = 1
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            git zip unzip python3-pip \
-            autoconf libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libtinfo5 cmake libffi-dev libssl-dev \
-            ccache liblzma-dev uuid-dev \
-            openjdk-17-jdk
-
-      - name: Set Java 17 as default
-        run: |
-          sudo update-java-alternatives --set java-1.17.0-openjdk-amd64
-          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
-          java -version
-
-      - name: Install Buildozer and deps
-        run: |
-          pip install --upgrade pip
-          pip install cython==0.29.33
-          pip install buildozer==1.5.0
-          pip install python-for-android==2024.1.21
-
-      - name: Pre-install Android SDK into Buildozer directory
-        run: |
-          # Create the exact path Buildozer uses internally
-          BUILDOZER_SDK=$HOME/.buildozer/android/platform/android-sdk
-          mkdir -p $BUILDOZER_SDK/cmdline-tools
-
-          # Download SDK command line tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline-tools.zip
-          unzip -q /tmp/cmdline-tools.zip -d $BUILDOZER_SDK/cmdline-tools
-          mv $BUILDOZER_SDK/cmdline-tools/cmdline-tools $BUILDOZER_SDK/cmdline-tools/latest
-
-          export PATH=$BUILDOZER_SDK/cmdline-tools/latest/bin:$PATH
-          export ANDROID_SDK_ROOT=$BUILDOZER_SDK
-
-          # Accept licenses and install API 33
-          yes | sdkmanager --sdk_root=$BUILDOZER_SDK --licenses
-          sdkmanager --sdk_root=$BUILDOZER_SDK \
-            "platforms;android-33" \
-            "build-tools;33.0.2" \
-            "platform-tools" \
-            "ndk;25.2.9519653"
-
-          echo "SDK installed at $BUILDOZER_SDK"
-          ls $BUILDOZER_SDK/platforms/
-
-      - name: Cache Buildozer download cache
-        uses: actions/cache@v4
-        with:
-          path: .buildozer_cache
-          key: buildozer-cache-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-cache-${{ runner.os }}-
-
-      - name: Cache Buildozer build directory
-        uses: actions/cache@v4
-        with:
-          path: .buildozer
-          key: buildozer-build-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-${{ hashFiles('**/*.py') }}
-          restore-keys: |
-            buildozer-build-${{ runner.os }}-
-
-      - name: Build APK (debug)
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
-          ANDROID_NDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk/ndk/25.2.9519653
-        run: |
-          export PATH=$JAVA_HOME/bin:$PATH
-          buildozer -v android debug 2>&1 | tee build.log || true
-
-      - name: Show build log tail
-        if: always()
-        run: |
-          echo "=== LAST 100 LINES ==="
-          tail -100 build.log || echo "No build.log found"
-
-      - name: List bin directory
-        if: always()
-        run: |
-          ls -lh bin/ 2>/dev/null || echo "bin/ does not exist"
-          find . -name "*.apk" 2>/dev/null || echo "No .apk files found"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cone-calculator-debug-apk
-          path: bin/*.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build.log
-          retention-days: 7
+[buildozer]
+build_dir = .buildozer
+cache_dir = .buildozer_cache
