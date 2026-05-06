@@ -1,3 +1,31 @@
+import sys
+import traceback
+import os
+
+def _setup_crash_logger():
+    """Write uncaught exceptions to a file on Android for debugging."""
+    try:
+        log_paths = [
+            "/sdcard/cone_crash.log",
+            "/storage/emulated/0/cone_crash.log",
+            os.path.join(os.getcwd(), "cone_crash.log"),
+        ]
+        def handle_exception(exc_type, exc_value, exc_tb):
+            msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
+            for path in log_paths:
+                try:
+                    with open(path, 'w') as f:
+                        f.write(msg)
+                    break
+                except Exception:
+                    continue
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+        sys.excepthook = handle_exception
+    except Exception:
+        pass
+
+_setup_crash_logger()
+
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
