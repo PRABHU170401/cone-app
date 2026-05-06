@@ -1,65 +1,117 @@
-[app]
+name: Build Android APK
 
-# App title shown on Android launcher
-title = Cone Calculator
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
 
-# Package name (must be unique, lowercase, no spaces)
-package.name = conecalculator
+jobs:
+  build-apk:
+    name: Build APK with Buildozer
+    runs-on: ubuntu-22.04
 
-# Package domain (reverse domain notation)
-package.domain = org.ken
+    steps:
+      # ── 1. Check out the repository ──────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-# Source directory (relative to buildozer.spec)
-source.dir = .
+      # ── 2. Rename main Python file to main.py ────────────────────────────────
+      - name: Rename entry point to main.py
+        run: |
+          if [ ! -f main.py ]; then
+            PY_FILE=$(ls cone_calculator*.py 2>/dev/null | head -1)
+            if [ -n "$PY_FILE" ]; then
+              cp "$PY_FILE" main.py
+              echo "Renamed $PY_FILE to main.py"
+            else
+              echo "ERROR: No cone_calculator*.py file found!"
+              ls -la *.py || true
+              exit 1
+            fi
+          else
+            echo "main.py already exists, skipping rename."
+          fi
 
-# Main entry point — Buildozer REQUIRES this to be main.py
-# The workflow renames your .py file to main.py automatically
-source.main = main.py
+      # ── 3. Set up Python ─────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-# File extensions to include in the APK
-source.include_exts = py,png,jpg,kv,atlas,json,txt
+      # ── 4. Install system dependencies ───────────────────────────────────────
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            git zip unzip python3-pip \
+            autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libtinfo5 cmake libffi-dev libssl-dev \
+            ccache openjdk-17-jdk
 
-# App version
-version = 1.2.0
+      # ── 5. Cache Buildozer downloads ─────────────────────────────────────────
+      - name: Cache Buildozer download cache
+        uses: actions/cache@v4
+        with:
+          path: .buildozer_cache
+          key: buildozer-cache-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-cache-${{ runner.os }}-
 
-# Requirements — all packages the app needs
-requirements = python3,kivy==2.3.0,openpyxl
+      # ── 6. Cache Buildozer build directory ───────────────────────────────────
+      - name: Cache Buildozer build directory
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: buildozer-build-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-${{ hashFiles('**/*.py') }}
+          restore-keys: |
+            buildozer-build-${{ runner.os }}-
 
-# Android permissions
-android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,INTERNET
+      # ── 7. Install Buildozer and Cython ──────────────────────────────────────
+      - name: Install Buildozer
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython
 
-# Minimum and target Android API
-android.minapi = 21
-android.api = 33
-android.ndk = 25b
+      # ── 8. Build debug APK ───────────────────────────────────────────────────
+      - name: Build APK (debug)
+        env:
+          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+        run: |
+          buildozer -v android debug 2>&1 | tee build.log || true
 
-# Android architecture(s) — arm64-v8a covers most modern phones
-android.archs = arm64-v8a
+      # ── 9. Show last 100 lines of build log ──────────────────────────────────
+      - name: Show build log tail
+        if: always()
+        run: |
+          echo "=== LAST 100 LINES OF BUILD LOG ==="
+          tail -100 build.log || echo "No build.log found"
 
-# Accept Android SDK license automatically in CI
-android.accept_sdk_license = True
+      # ── 10. List bin directory ────────────────────────────────────────────────
+      - name: List bin directory
+        if: always()
+        run: |
+          echo "=== bin/ contents ==="
+          ls -lh bin/ 2>/dev/null || echo "bin/ does not exist"
+          echo "=== APK search ==="
+          find . -name "*.apk" 2>/dev/null || echo "No .apk files found"
 
-# Orientation
-orientation = portrait
+      # ── 11. Upload APK artifact ───────────────────────────────────────────────
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cone-calculator-debug-apk
+          path: bin/*.apk
+          if-no-files-found: error
+          retention-days: 30
 
-# Fullscreen (0 = show status bar, 1 = hide it)
-fullscreen = 0
-
-# Icon (place a 512x512 icon.png next to buildozer.spec to use it)
-# icon.filename = %(source.dir)s/icon.png
-
-# Presplash (place a presplash.png next to buildozer.spec to use it)
-# presplash.filename = %(source.dir)s/presplash.png
-
-# Log level: 0 = error only, 1 = info, 2 = debug
-log_level = 2
-
-# Warn when buildozer is newer than what the spec was written for
-warn_on_root = 1
-
-[buildozer]
-# Build directory (relative)
-build_dir = .buildozer
-
-# Cache downloaded files here
-cache_dir = .buildozer_cache
+      # ── 12. Upload build log ──────────────────────────────────────────────────
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
