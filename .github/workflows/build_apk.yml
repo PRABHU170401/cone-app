@@ -100,6 +100,13 @@ jobs:
           echo "SDK installed at $BUILDOZER_SDK"
           ls $BUILDOZER_SDK/platforms/
 
+          # Buildozer 1.5.0 looks for sdkmanager at the legacy tools/bin/ path.
+          # Create symlinks so it finds the cmdline-tools installation.
+          mkdir -p $BUILDOZER_SDK/tools/bin
+          ln -sf $BUILDOZER_SDK/cmdline-tools/latest/bin/sdkmanager $BUILDOZER_SDK/tools/bin/sdkmanager
+          ln -sf $BUILDOZER_SDK/cmdline-tools/latest/bin/avdmanager  $BUILDOZER_SDK/tools/bin/avdmanager
+          echo "sdkmanager symlink: $(ls -la $BUILDOZER_SDK/tools/bin/sdkmanager)"
+
       - name: Cache Buildozer download cache
         uses: actions/cache@v4
         with:
