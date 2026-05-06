@@ -13,7 +13,7 @@ requirements = python3==3.10.14,kivy==2.3.0,openpyxl,et_xmlfile,pillow,sdl2,sdl2
 android.permissions = INTERNET, READ_EXTERNAL_STORAGE, WRITE_EXTERNAL_STORAGE
 android.minapi = 21
 # Downgraded from 36 to 34 for stability with Buildozer 1.5.0
-android.api = 34
+android.api = 32
 android.ndk = 25c
 android.archs = arm64-v8a
 android.accept_sdk_license = True
