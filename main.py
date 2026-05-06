@@ -27,7 +27,7 @@ except ImportError:
     EXCEL_AVAILABLE = False
 
 # ── Palette ───────────────────────────────────────────────────────────────────
-Window.clearcolor = (0.13, 0.10, 0.22, 1)
+# Window.clearcolor moved to build()
 
 C_BG        = (0.11, 0.09, 0.20, 1)
 C_SURFACE   = (0.18, 0.14, 0.30, 1)
@@ -1730,8 +1730,20 @@ class ConeCalculator(FloatLayout):
 # ── App entry point ───────────────────────────────────────────────────────────
 class ConeApp(App):
     def build(self):
-        self.title = 'Cone Calculator \u2014 by Ken'
+        self.title = 'Cone Calculator — by Ken'
+        Window.clearcolor = (0.13, 0.10, 0.22, 1)
+        self._request_android_permissions()
         return ConeCalculator()
+
+    def _request_android_permissions(self):
+        try:
+            from android.permissions import request_permissions, Permission
+            request_permissions([
+                Permission.READ_EXTERNAL_STORAGE,
+                Permission.WRITE_EXTERNAL_STORAGE,
+            ])
+        except ImportError:
+            pass  # Not on Android, skip silently
 
 
 if __name__ == '__main__':
