@@ -628,7 +628,7 @@ class ResultRecordListPopup(Popup):
 
         root = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(8))
 
-        # Column header row
+        # Column  header row
         col_hdr = GridLayout(
             cols=4, size_hint_y=None, height=dp(28),
             spacing=[dp(4), 0], padding=[dp(14), 0],
