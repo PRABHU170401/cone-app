@@ -20,13 +20,11 @@ jobs:
       # ── 2. Rename main Python file to main.py ────────────────────────────────
       - name: Rename entry point to main.py
         run: |
-          # Find the app Python file and rename it to main.py
-          # (Buildozer requires the entry point to be named main.py)
           if [ ! -f main.py ]; then
             PY_FILE=$(ls cone_calculator*.py 2>/dev/null | head -1)
             if [ -n "$PY_FILE" ]; then
               cp "$PY_FILE" main.py
-              echo "Renamed $PY_FILE → main.py"
+              echo "Renamed $PY_FILE to main.py"
             else
               echo "ERROR: No cone_calculator*.py file found!"
               ls -la *.py || true
@@ -42,7 +40,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      # ── 4. Install system dependencies for Buildozer / Android SDK ───────────
+      # ── 4. Install system dependencies ───────────────────────────────────────
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
@@ -53,7 +51,7 @@ jobs:
             libtinfo5 cmake libffi-dev libssl-dev \
             ccache openjdk-17-jdk
 
-      # ── 5. Cache Buildozer downloads (.buildozer_cache) ──────────────────────
+      # ── 5. Cache Buildozer downloads ─────────────────────────────────────────
       - name: Cache Buildozer download cache
         uses: actions/cache@v4
         with:
@@ -62,7 +60,7 @@ jobs:
           restore-keys: |
             buildozer-cache-${{ runner.os }}-
 
-      # ── 6. Cache the .buildozer build directory (speeds up rebuilds) ─────────
+      # ── 6. Cache Buildozer build directory ───────────────────────────────────
       - name: Cache Buildozer build directory
         uses: actions/cache@v4
         with:
@@ -82,18 +80,25 @@ jobs:
         env:
           ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
         run: |
-          buildozer -v android debug 2>&1 | tee build.log
+          buildozer -v android debug 2>&1 | tee build.log || true
 
-      # ── 9. Show bin/ contents (debug: helps confirm APK was created) ─────────
+      # ── 9. Show last 100 lines of build log ──────────────────────────────────
+      - name: Show build log tail
+        if: always()
+        run: |
+          echo "=== LAST 100 LINES OF BUILD LOG ==="
+          tail -100 build.log || echo "No build.log found"
+
+      # ── 10. List bin directory ────────────────────────────────────────────────
       - name: List bin directory
         if: always()
         run: |
           echo "=== bin/ contents ==="
-          ls -lh bin/ 2>/dev/null || echo "bin/ directory does not exist!"
+          ls -lh bin/ 2>/dev/null || echo "bin/ does not exist"
           echo "=== APK search ==="
-          find . -name "*.apk" 2>/dev/null || echo "No .apk files found anywhere."
+          find . -name "*.apk" 2>/dev/null || echo "No .apk files found"
 
-      # ── 10. Upload the APK as a build artifact ───────────────────────────────
+      # ── 11. Upload APK artifact ───────────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -102,7 +107,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # ── 11. Upload build log for debugging ───────────────────────────────────
+      # ── 12. Upload build log ──────────────────────────────────────────────────
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
