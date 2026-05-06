@@ -26,7 +26,7 @@ try:
 except ImportError:
     EXCEL_AVAILABLE = False
 
-# ──  Palette ───────────────────────────────────────────────────────────────────
+# ── Palette ───────────────────────────────────────────────────────────────────
 Window.clearcolor = (0.13, 0.10, 0.22, 1)
 
 C_BG        = (0.11, 0.09, 0.20, 1)
@@ -1393,14 +1393,15 @@ class ConeCalculator(FloatLayout):
             self.title_input.text = value
 
     def _get_save_folder(self):
-        # On Android 10+, apps cannot write to /sdcard or /storage/emulated/0
-        # without MANAGE_EXTERNAL_STORAGE (restricted by Google Play).
-        # Use the app's private external files dir — no permissions needed.
+        # Use Kivy's user_data_dir — always writable on Android with no
+        # extra permissions required (maps to the app's private internal
+        # storage: /data/data/<package>/files/).
         try:
-            from android.storage import app_storage_path
-            base = app_storage_path()
+            from kivy.app import App as _App
+            running = _App.get_running_app()
+            base = running.user_data_dir if running else os.path.expanduser("~")
         except Exception:
-            base = os.path.join(os.path.expanduser("~"), "Documents")
+            base = os.path.expanduser("~")
 
         folder = os.path.join(base, "MyResults")
         try:
@@ -1411,7 +1412,7 @@ class ConeCalculator(FloatLayout):
             os.remove(test)
             return folder
         except Exception:
-            # Last resort: app's internal data directory
+            # Last resort: working directory
             fallback = os.path.join(os.getcwd(), "MyResults")
             os.makedirs(fallback, exist_ok=True)
             return fallback
@@ -1732,14 +1733,23 @@ class ConeApp(App):
         return ConeCalculator()
 
     def _request_android_permissions(self):
+        # READ/WRITE_EXTERNAL_STORAGE are ignored on Android 13+ (API 33+)
+        # and can cause a crash on some devices.  Since we now write only to
+        # user_data_dir (private internal storage) no runtime permissions are
+        # needed at all.  We keep the try/except so the app still works on
+        # older API levels and on desktop.
         try:
             from android.permissions import request_permissions, Permission
-            request_permissions([
-                Permission.READ_EXTERNAL_STORAGE,
-                Permission.WRITE_EXTERNAL_STORAGE,
-            ])
+            # Only request permissions that are actually relevant on API < 33
+            import android
+            api = android.mActivity.getApplicationInfo().targetSdkVersion
+            if api < 33:
+                request_permissions([
+                    Permission.READ_EXTERNAL_STORAGE,
+                    Permission.WRITE_EXTERNAL_STORAGE,
+                ])
         except Exception:
-            pass  # Not on Android, or already granted
+            pass  # Not on Android, or permissions not needed
 
 
 if __name__ == '__main__':
