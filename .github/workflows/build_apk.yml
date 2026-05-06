@@ -34,7 +34,7 @@ jobs:
             echo "main.py already exists, skipping rename."
           fi
 
-      # ── 3. Set up Python 3.10 (NOT 3.11 — pyjnius is incompatible with 3.11) ─
+      # ── 3. Set up Python 3.10 ────────────────────────────────────────────────
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
@@ -70,11 +70,13 @@ jobs:
           restore-keys: |
             buildozer-build-${{ runner.os }}-
 
-      # ── 7. Install Buildozer and Cython ──────────────────────────────────────
+      # ── 7. Install Buildozer with pinned p4a ─────────────────────────────────
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
-          pip install buildozer cython==0.29.33
+          pip install cython==0.29.33
+          pip install buildozer==1.5.0
+          pip install python-for-android==2023.9.16
 
       # ── 8. Build debug APK ───────────────────────────────────────────────────
       - name: Build APK (debug)
