@@ -3,8 +3,6 @@ name: Build Android APK
 on:
   push:
     branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -16,38 +14,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Rename entry point to main.py
-        run: |
-          if [ ! -f main.py ]; then
-            PY_FILE=$(ls cone_calculator*.py 2>/dev/null | head -1)
-            if [ -n "$PY_FILE" ]; then
-              cp "$PY_FILE" main.py
-              echo "Renamed $PY_FILE to main.py"
-            else
-              echo "ERROR: No cone_calculator*.py file found!"
-              exit 1
-            fi
-          else
-            echo "main.py already exists."
-          fi
-
-      - name: Verify buildozer.spec is valid INI (not YAML)
-        run: |
-          echo "=== First 5 lines of buildozer.spec ==="
-          head -5 buildozer.spec
-          if head -1 buildozer.spec | grep -q "^name:"; then
-            echo "ERROR: buildozer.spec looks like YAML! It must be INI format starting with [app]"
-            exit 1
-          fi
-          python3 -c "
-          import configparser
-          c = configparser.ConfigParser()
-          c.read('buildozer.spec')
-          print('buildozer.spec sections:', c.sections())
-          assert 'app' in c.sections(), 'Missing [app] section!'
-          print('buildozer.spec is valid.')
-          "
-
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
@@ -55,107 +21,23 @@ jobs:
 
       - name: Install system dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            git zip unzip python3-pip \
-            autoconf libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libtinfo5 cmake libffi-dev libssl-dev \
-            ccache liblzma-dev uuid-dev \
-            openjdk-17-jdk
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip python3-pip autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev \
+            libssl-dev ccache liblzma-dev uuid-dev openjdk-17-jdk
 
-      - name: Set Java 17 as default
-        run: |
-          sudo update-java-alternatives --set java-1.17.0-openjdk-amd64
-          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
-          java -version
-
-      - name: Install Buildozer and deps
+      - name: Install Buildozer and Cython
         run: |
           pip install --upgrade pip
-          pip install cython==0.29.33
-          pip install buildozer==1.5.0
-          pip install python-for-android==2024.1.21
+          pip install cython==0.29.33 buildozer==1.5.0
 
-      - name: Pre-install Android SDK into Buildozer directory
-        run: |
-          BUILDOZER_SDK=$HOME/.buildozer/android/platform/android-sdk
-          mkdir -p $BUILDOZER_SDK/cmdline-tools
-
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline-tools.zip
-          unzip -q /tmp/cmdline-tools.zip -d $BUILDOZER_SDK/cmdline-tools
-          mv $BUILDOZER_SDK/cmdline-tools/cmdline-tools $BUILDOZER_SDK/cmdline-tools/latest
-
-          export PATH=$BUILDOZER_SDK/cmdline-tools/latest/bin:$PATH
-          export ANDROID_SDK_ROOT=$BUILDOZER_SDK
-
-          # Accept licenses and install API 36 (Android 16)
-          yes | sdkmanager --sdk_root=$BUILDOZER_SDK --licenses
-          sdkmanager --sdk_root=$BUILDOZER_SDK \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "platform-tools" \
-            "ndk;25.2.9519653"
-
-          echo "SDK installed at $BUILDOZER_SDK"
-          ls $BUILDOZER_SDK/platforms/
-
-          # Buildozer 1.5.0 looks for sdkmanager at the legacy tools/bin/ path.
-          # Create symlinks so it finds the cmdline-tools installation.
-          mkdir -p $BUILDOZER_SDK/tools/bin
-          ln -sf $BUILDOZER_SDK/cmdline-tools/latest/bin/sdkmanager $BUILDOZER_SDK/tools/bin/sdkmanager
-          ln -sf $BUILDOZER_SDK/cmdline-tools/latest/bin/avdmanager  $BUILDOZER_SDK/tools/bin/avdmanager
-          echo "sdkmanager symlink: $(ls -la $BUILDOZER_SDK/tools/bin/sdkmanager)"
-
-      - name: Cache Buildozer download cache
-        uses: actions/cache@v4
-        with:
-          path: .buildozer_cache
-          key: buildozer-cache-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-cache-${{ runner.os }}-
-
-      - name: Cache Buildozer build directory
-        uses: actions/cache@v4
-        with:
-          path: .buildozer
-          key: buildozer-build-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}-${{ hashFiles('**/*.py') }}
-          restore-keys: |
-            buildozer-build-${{ runner.os }}-
-
-      - name: Build APK (debug)
+      - name: Build with Buildozer
+        run: yes | buildozer -v android debug
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
-          ANDROID_NDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk/ndk/25.2.9519653
-        run: |
-          export PATH=$JAVA_HOME/bin:$PATH
-          buildozer -v android debug 2>&1 | tee build.log || true
 
-      - name: Show build log tail
-        if: always()
-        run: |
-          echo "=== LAST 100 LINES ==="
-          tail -100 build.log || echo "No build.log found"
-
-      - name: List bin directory
-        if: always()
-        run: |
-          ls -lh bin/ 2>/dev/null || echo "bin/ does not exist"
-          find . -name "*.apk" 2>/dev/null || echo "No .apk files found"
-
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: cone-calculator-debug-apk
+          name: cone-calculator-debug
           path: bin/*.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build.log
-          retention-days: 7
