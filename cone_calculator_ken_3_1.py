@@ -861,7 +861,7 @@ class SidePanel(FloatLayout):
         ))
         self.panel.add_widget(ph)
 
-        # ── Divider ───────────────────────────────────────────────────────────
+        # ─ ─ Divider ───────────────────────────────────────────────────────────
         self.panel.add_widget(Widget(size_hint_y=None, height=dp(1)))
 
         # ── Scroll area for menu items ─────────────────────────────────────────
